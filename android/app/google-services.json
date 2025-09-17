@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1093588840180",
+    "project_id": "masindecollections",
+    "storage_bucket": "masindecollections.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1093588840180:android:9e7865bdd00d5d768338a1",
+        "android_client_info": {
+          "package_name": "com.example.masindes2"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAKaq9lZFSQO9BR44Mp6UvTeAxbk1jsOZ8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
