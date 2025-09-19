@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class FamilyMembersScreen extends StatefulWidget {
   const FamilyMembersScreen({super.key});
@@ -8,83 +9,7 @@ class FamilyMembersScreen extends StatefulWidget {
 }
 
 class _FamilyMembersScreenState extends State<FamilyMembersScreen> {
-  // Sample family members data
-  List<Map<String, dynamic>> familyMembers = [
-    {
-      'id': '1',
-      'name': 'John Doe',
-      'contact': '+1234567890',
-      'country': 'Uganda',
-      'email': 'john.doe@email.com',
-      'joinDate': '2024-01-15',
-      'totalContributed': 450.0,
-    },
-    {
-      'id': '2',
-      'name': 'Sarah Smith',
-      'contact': '+1234567891',
-      'country': 'Kenya',
-      'email': 'sarah.smith@email.com',
-      'joinDate': '2024-01-20',
-      'totalContributed': 600.0,
-    },
-    {
-      'id': '3',
-      'name': 'Mike Johnson',
-      'contact': '+1234567892',
-      'country': 'Tanzania',
-      'email': '',
-      'joinDate': '2024-02-01',
-      'totalContributed': 300.0,
-    },
-    {
-      'id': '4',
-      'name': 'Lisa Brown',
-      'contact': '+1234567893',
-      'country': 'Rwanda',
-      'email': 'lisa.brown@email.com',
-      'joinDate': '2024-02-10',
-      'totalContributed': 525.0,
-    },
-    {
-      'id': '5',
-      'name': 'David Wilson',
-      'contact': '+1234567894',
-      'country': '',
-      'email': 'david.wilson@email.com',
-      'joinDate': '2024-03-01',
-      'totalContributed': 125.0,
-    },
-  ];
-
   String searchQuery = '';
-
-  List<Map<String, dynamic>> get filteredMembers {
-    if (searchQuery.isEmpty) {
-      return familyMembers;
-    }
-    return familyMembers
-        .where(
-          (member) =>
-              member['name'].toLowerCase().contains(
-                searchQuery.toLowerCase(),
-              ) ||
-              member['contact'].toLowerCase().contains(
-                searchQuery.toLowerCase(),
-              ) ||
-              member['country'].toLowerCase().contains(
-                searchQuery.toLowerCase(),
-              ),
-        )
-        .toList();
-  }
-
-  double get totalContributions {
-    return familyMembers.fold(
-      0.0,
-      (sum, member) => sum + member['totalContributed'],
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -108,7 +33,6 @@ class _FamilyMembersScreenState extends State<FamilyMembersScreen> {
       ),
       body: Column(
         children: [
-          // Add Member Button
           Container(
             width: double.infinity,
             padding: const EdgeInsets.all(16),
@@ -137,78 +61,6 @@ class _FamilyMembersScreenState extends State<FamilyMembersScreen> {
               ),
             ),
           ),
-
-          // Stats Card
-          Container(
-            margin: const EdgeInsets.all(16),
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
-                  blurRadius: 10,
-                  offset: const Offset(0, 5),
-                ),
-              ],
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Total Members',
-                        style: TextStyle(
-                          color: Colors.grey[600],
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        familyMembers.length.toString(),
-                        style: const TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.blue,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Container(width: 1, height: 40, color: Colors.grey[300]),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Text(
-                        'Total Contributions',
-                        style: TextStyle(
-                          color: Colors.grey[600],
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        '\$${totalContributions.toStringAsFixed(0)}',
-                        style: const TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.green,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          // Search Field
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: TextField(
@@ -234,13 +86,19 @@ class _FamilyMembersScreenState extends State<FamilyMembersScreen> {
               },
             ),
           ),
-
           const SizedBox(height: 16),
-
-          // Members List
           Expanded(
-            child: filteredMembers.isEmpty
-                ? Center(
+            child: StreamBuilder<QuerySnapshot>(
+              stream: FirebaseFirestore.instance
+                  .collection('family_members')
+                  .orderBy('name')
+                  .snapshots(),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                  return Center(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
@@ -251,9 +109,7 @@ class _FamilyMembersScreenState extends State<FamilyMembersScreen> {
                         ),
                         const SizedBox(height: 16),
                         Text(
-                          searchQuery.isNotEmpty
-                              ? 'No members found'
-                              : 'No family members yet',
+                          'No family members yet',
                           style: TextStyle(
                             fontSize: 16,
                             color: Colors.grey[600],
@@ -262,9 +118,7 @@ class _FamilyMembersScreenState extends State<FamilyMembersScreen> {
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          searchQuery.isNotEmpty
-                              ? 'Try adjusting your search'
-                              : 'Add your first family member to get started',
+                          'Add your first family member to get started',
                           style: TextStyle(
                             fontSize: 14,
                             color: Colors.grey[500],
@@ -272,17 +126,34 @@ class _FamilyMembersScreenState extends State<FamilyMembersScreen> {
                         ),
                       ],
                     ),
-                  )
-                : ListView.separated(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    itemCount: filteredMembers.length,
-                    separatorBuilder: (context, index) =>
-                        const SizedBox(height: 12),
-                    itemBuilder: (context, index) {
-                      final member = filteredMembers[index];
-                      return _buildMemberCard(member);
-                    },
-                  ),
+                  );
+                }
+                final members = snapshot.data!.docs.where((doc) {
+                  final data = doc.data() as Map<String, dynamic>;
+                  return searchQuery.isEmpty ||
+                      (data['name'] ?? '').toLowerCase().contains(
+                        searchQuery.toLowerCase(),
+                      ) ||
+                      (data['contact'] ?? '').toLowerCase().contains(
+                        searchQuery.toLowerCase(),
+                      ) ||
+                      (data['country'] ?? '').toLowerCase().contains(
+                        searchQuery.toLowerCase(),
+                      );
+                }).toList();
+                return ListView.separated(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  itemCount: members.length,
+                  separatorBuilder: (context, index) =>
+                      const SizedBox(height: 12),
+                  itemBuilder: (context, index) {
+                    final member =
+                        members[index].data() as Map<String, dynamic>;
+                    return _buildMemberCard(member);
+                  },
+                );
+              },
+            ),
           ),
         ],
       ),
@@ -320,10 +191,11 @@ class _FamilyMembersScreenState extends State<FamilyMembersScreen> {
                       ).primaryColor.withOpacity(0.1),
                       child: Text(
                         member['name']
-                            .toString()
-                            .split(' ')
-                            .map((e) => e[0])
-                            .join(),
+                                ?.toString()
+                                .split(' ')
+                                .map((e) => e[0])
+                                .join() ??
+                            '',
                         style: TextStyle(
                           color: Theme.of(context).primaryColor,
                           fontWeight: FontWeight.bold,
@@ -337,7 +209,7 @@ class _FamilyMembersScreenState extends State<FamilyMembersScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            member['name'],
+                            member['name'] ?? '',
                             style: const TextStyle(
                               fontWeight: FontWeight.w600,
                               fontSize: 16,
@@ -353,7 +225,7 @@ class _FamilyMembersScreenState extends State<FamilyMembersScreen> {
                               ),
                               const SizedBox(width: 4),
                               Text(
-                                member['contact'],
+                                member['contact'] ?? '',
                                 style: TextStyle(
                                   color: Colors.grey[600],
                                   fontSize: 14,
@@ -362,7 +234,7 @@ class _FamilyMembersScreenState extends State<FamilyMembersScreen> {
                             ],
                           ),
                           const SizedBox(height: 2),
-                          if (member['country'].isNotEmpty)
+                          if ((member['country'] ?? '').isNotEmpty)
                             Row(
                               children: [
                                 const Icon(
@@ -372,7 +244,7 @@ class _FamilyMembersScreenState extends State<FamilyMembersScreen> {
                                 ),
                                 const SizedBox(width: 4),
                                 Text(
-                                  member['country'],
+                                  member['country'] ?? '',
                                   style: TextStyle(
                                     color: Colors.grey[600],
                                     fontSize: 14,
@@ -380,7 +252,7 @@ class _FamilyMembersScreenState extends State<FamilyMembersScreen> {
                                 ),
                               ],
                             ),
-                          if (member['email'].isNotEmpty)
+                          if ((member['email'] ?? '').isNotEmpty)
                             Row(
                               children: [
                                 const Icon(
@@ -391,7 +263,7 @@ class _FamilyMembersScreenState extends State<FamilyMembersScreen> {
                                 const SizedBox(width: 4),
                                 Expanded(
                                   child: Text(
-                                    member['email'],
+                                    member['email'] ?? '',
                                     style: TextStyle(
                                       color: Colors.grey[600],
                                       fontSize: 14,
@@ -408,7 +280,7 @@ class _FamilyMembersScreenState extends State<FamilyMembersScreen> {
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
                         Text(
-                          '\$${member['totalContributed'].toStringAsFixed(0)}',
+                          'UGX ${(member['totalContributed'] ?? 0.0).toStringAsFixed(0)}',
                           style: const TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 16,
@@ -455,7 +327,6 @@ class _FamilyMembersScreenState extends State<FamilyMembersScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // Name (Required)
                 TextFormField(
                   controller: nameController,
                   decoration: InputDecoration(
@@ -473,8 +344,6 @@ class _FamilyMembersScreenState extends State<FamilyMembersScreen> {
                   },
                 ),
                 const SizedBox(height: 16),
-
-                // Contact (Required)
                 TextFormField(
                   controller: contactController,
                   decoration: InputDecoration(
@@ -493,8 +362,6 @@ class _FamilyMembersScreenState extends State<FamilyMembersScreen> {
                   },
                 ),
                 const SizedBox(height: 16),
-
-                // Country (Optional)
                 TextFormField(
                   controller: countryController,
                   decoration: InputDecoration(
@@ -506,8 +373,6 @@ class _FamilyMembersScreenState extends State<FamilyMembersScreen> {
                   ),
                 ),
                 const SizedBox(height: 16),
-
-                // Email (Optional)
                 TextFormField(
                   controller: emailController,
                   decoration: InputDecoration(
@@ -539,19 +404,18 @@ class _FamilyMembersScreenState extends State<FamilyMembersScreen> {
             child: const Text('Cancel'),
           ),
           ElevatedButton(
-            onPressed: () {
+            onPressed: () async {
               if (formKey.currentState!.validate()) {
-                setState(() {
-                  familyMembers.add({
-                    'id': (familyMembers.length + 1).toString(),
-                    'name': nameController.text,
-                    'contact': contactController.text,
-                    'country': countryController.text,
-                    'email': emailController.text,
-                    'joinDate': DateTime.now().toString().substring(0, 10),
-                    'totalContributed': 0.0,
-                  });
-                });
+                await FirebaseFirestore.instance
+                    .collection('family_members')
+                    .add({
+                      'name': nameController.text,
+                      'contact': contactController.text,
+                      'country': countryController.text,
+                      'email': emailController.text,
+                      'joinDate': DateTime.now().toString().substring(0, 10),
+                      'totalContributed': 0.0,
+                    });
                 Navigator.pop(context);
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
@@ -594,16 +458,16 @@ class _FamilyMembersScreenState extends State<FamilyMembersScreen> {
               ],
             ),
             const SizedBox(height: 24),
-            _buildDetailRow('Name', member['name']),
-            _buildDetailRow('Contact', member['contact']),
-            if (member['country'].isNotEmpty)
-              _buildDetailRow('Country', member['country']),
-            if (member['email'].isNotEmpty)
-              _buildDetailRow('Email', member['email']),
-            _buildDetailRow('Join Date', member['joinDate']),
+            _buildDetailRow('Name', member['name'] ?? ''),
+            _buildDetailRow('Contact', member['contact'] ?? ''),
+            if ((member['country'] ?? '').isNotEmpty)
+              _buildDetailRow('Country', member['country'] ?? ''),
+            if ((member['email'] ?? '').isNotEmpty)
+              _buildDetailRow('Email', member['email'] ?? ''),
+            _buildDetailRow('Join Date', member['joinDate'] ?? ''),
             _buildDetailRow(
               'Total Contributed',
-              '\$${member['totalContributed']}',
+              'UGX ${(member['totalContributed'] ?? 0.0).toStringAsFixed(0)}',
             ),
           ],
         ),
