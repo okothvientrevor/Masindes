@@ -1,4 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+
+String formatAmount(double amount) {
+  return amount
+      .toStringAsFixed(0)
+      .replaceAllMapped(
+        RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+        (Match m) => '${m[1]},',
+      );
+}
 
 class DisbursementsScreen extends StatefulWidget {
   const DisbursementsScreen({super.key});
@@ -11,87 +21,57 @@ class _DisbursementsScreenState extends State<DisbursementsScreen> {
   String selectedFilter = 'All';
   String selectedSort = 'Date (Latest)';
 
-  // Sample disbursements data
-  final List<Map<String, dynamic>> disbursements = [
-    {
-      'id': '1',
-      'amount': 500.0,
-      'date': '2024-06-15',
-      'recipient': 'Grandmother Mary',
-      'purpose': 'Monthly Support',
-      'status': 'Completed',
-      'method': 'Bank Transfer',
-      'reference': 'DISB001',
-      'notes': 'Regular monthly allowance',
-    },
-    {
-      'id': '2',
-      'amount': 750.0,
-      'date': '2024-06-10',
-      'recipient': 'Grandfather John',
-      'purpose': 'Medical Bills',
-      'status': 'Completed',
-      'method': 'Mobile Money',
-      'reference': 'DISB002',
-      'notes': 'Hospital treatment costs',
-    },
-    {
-      'id': '3',
-      'amount': 300.0,
-      'date': '2024-06-05',
-      'recipient': 'Grandmother Mary',
-      'purpose': 'Groceries',
-      'status': 'Completed',
-      'method': 'Cash Delivery',
-      'reference': 'DISB003',
-      'notes': 'Weekly grocery allowance',
-    },
-    {
-      'id': '4',
-      'amount': 1000.0,
-      'date': '2024-06-01',
-      'recipient': 'Both Grandparents',
-      'purpose': 'House Repairs',
-      'status': 'Pending',
-      'method': 'Bank Transfer',
-      'reference': 'DISB004',
-      'notes': 'Roof repair and maintenance',
-    },
-    {
-      'id': '5',
-      'amount': 400.0,
-      'date': '2024-05-28',
-      'recipient': 'Grandfather John',
-      'purpose': 'Medication',
-      'status': 'Completed',
-      'method': 'Mobile Money',
-      'reference': 'DISB005',
-      'notes': 'Monthly prescription refill',
-    },
-    {
-      'id': '6',
-      'amount': 600.0,
-      'date': '2024-05-25',
-      'recipient': 'Grandmother Mary',
-      'purpose': 'Monthly Support',
-      'status': 'Completed',
-      'method': 'Bank Transfer',
-      'reference': 'DISB006',
-      'notes': 'Regular monthly allowance',
-    },
-  ];
+  List<Map<String, dynamic>> disbursements = [];
+  double totalDisbursed = 0.0;
+  double currentBalance = 0.0;
+  int thisMonthDisbursements = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchDisbursements();
+  }
+
+  Future<void> _fetchDisbursements() async {
+    // Fetch disbursements from Firestore
+    final snapshot = await FirebaseFirestore.instance
+        .collection('disbursements')
+        .get();
+    final now = DateTime.now();
+    final thisMonth = '${now.year}-${now.month.toString().padLeft(2, '0')}';
+    double disbursed = 0.0;
+    int monthCount = 0;
+    List<Map<String, dynamic>> list = snapshot.docs.map((doc) {
+      final data = doc.data();
+      if (data['status'] == 'Completed') {
+        disbursed += data['amount']?.toDouble() ?? 0.0;
+      }
+      if ((data['date'] ?? '').toString().startsWith(thisMonth)) {
+        monthCount++;
+      }
+      return data;
+    }).toList();
+    // Fetch total contributions for balance
+    final membersSnapshot = await FirebaseFirestore.instance
+        .collection('family_members')
+        .get();
+    double totalContributed = 0.0;
+    for (var doc in membersSnapshot.docs) {
+      totalContributed += doc['totalContributed']?.toDouble() ?? 0.0;
+    }
+    setState(() {
+      disbursements = list;
+      totalDisbursed = disbursed;
+      currentBalance = totalContributed - disbursed;
+      thisMonthDisbursements = monthCount;
+    });
+  }
 
   List<Map<String, dynamic>> get filteredDisbursements {
     List<Map<String, dynamic>> filtered = disbursements;
-
-    // Apply status filter
     if (selectedFilter != 'All') {
-      filtered = filtered
-          .where((disbursement) => disbursement['status'] == selectedFilter)
-          .toList();
+      filtered = filtered.where((d) => d['status'] == selectedFilter).toList();
     }
-
-    // Apply sorting
     switch (selectedSort) {
       case 'Date (Latest)':
         filtered.sort((a, b) => b['date'].compareTo(a['date']));
@@ -106,28 +86,7 @@ class _DisbursementsScreenState extends State<DisbursementsScreen> {
         filtered.sort((a, b) => a['amount'].compareTo(b['amount']));
         break;
     }
-
     return filtered;
-  }
-
-  double get totalDisbursed {
-    return disbursements
-        .where((disbursement) => disbursement['status'] == 'Completed')
-        .fold(0.0, (sum, disbursement) => sum + disbursement['amount']);
-  }
-
-  double get pendingAmount {
-    return disbursements
-        .where((disbursement) => disbursement['status'] == 'Pending')
-        .fold(0.0, (sum, disbursement) => sum + disbursement['amount']);
-  }
-
-  int get thisMonthDisbursements {
-    final now = DateTime.now();
-    final thisMonth = '${now.year}-${now.month.toString().padLeft(2, '0')}';
-    return disbursements
-        .where((disbursement) => disbursement['date'].startsWith(thisMonth))
-        .length;
   }
 
   @override
@@ -192,7 +151,7 @@ class _DisbursementsScreenState extends State<DisbursementsScreen> {
                     Expanded(
                       child: _buildSummaryCard(
                         'Total Disbursed',
-                        '\$${totalDisbursed.toStringAsFixed(0)}',
+                        'UGX ${formatAmount(totalDisbursed)}',
                         Icons.check_circle,
                         Colors.green,
                       ),
@@ -200,10 +159,10 @@ class _DisbursementsScreenState extends State<DisbursementsScreen> {
                     const SizedBox(width: 12),
                     Expanded(
                       child: _buildSummaryCard(
-                        'Pending',
-                        '\$${pendingAmount.toStringAsFixed(0)}',
-                        Icons.pending,
-                        Colors.orange,
+                        'Current Balance',
+                        'UGX ${formatAmount(currentBalance)}',
+                        Icons.account_balance_wallet,
+                        Colors.blue,
                       ),
                     ),
                   ],
@@ -213,7 +172,7 @@ class _DisbursementsScreenState extends State<DisbursementsScreen> {
                   'This Month Disbursements',
                   '$thisMonthDisbursements transactions',
                   Icons.calendar_today,
-                  Colors.blue,
+                  Colors.orange,
                 ),
               ],
             ),
@@ -463,7 +422,7 @@ class _DisbursementsScreenState extends State<DisbursementsScreen> {
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
                         Text(
-                          '${disbursement['amount']}',
+                          'UGX ${formatAmount(disbursement['amount']?.toDouble() ?? 0.0)}',
                           style: const TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 18,
@@ -567,13 +526,16 @@ class _DisbursementsScreenState extends State<DisbursementsScreen> {
             ),
             const SizedBox(height: 24),
             _buildDetailRow('Recipient', disbursement['recipient']),
-            _buildDetailRow('Amount', '\$${disbursement['amount']}'),
+            _buildDetailRow(
+              'Amount',
+              'UGX ${formatAmount(disbursement['amount']?.toDouble() ?? 0.0)}',
+            ),
             _buildDetailRow('Purpose', disbursement['purpose']),
             _buildDetailRow('Date', disbursement['date']),
             _buildDetailRow('Method', disbursement['method']),
             _buildDetailRow('Reference', disbursement['reference']),
             _buildDetailRow('Status', disbursement['status']),
-            if (disbursement['notes'].isNotEmpty)
+            if ((disbursement['notes'] ?? '').isNotEmpty)
               _buildDetailRow('Notes', disbursement['notes']),
           ],
         ),
@@ -646,7 +608,7 @@ class _DisbursementsScreenState extends State<DisbursementsScreen> {
                     items:
                         [
                           'Grandmother Mary',
-                          'Grandfather John',
+                          'Grandfather Andrew',
                           'Both Grandparents',
                         ].map((String recipient) {
                           return DropdownMenuItem<String>(
@@ -767,22 +729,21 @@ class _DisbursementsScreenState extends State<DisbursementsScreen> {
               child: const Text('Cancel'),
             ),
             ElevatedButton(
-              onPressed: () {
+              onPressed: () async {
                 if (formKey.currentState!.validate()) {
-                  setState(() {
-                    disbursements.insert(0, {
-                      'id': (disbursements.length + 1).toString(),
-                      'amount': double.parse(amountController.text),
-                      'date': selectedDate.toString().substring(0, 10),
-                      'recipient': selectedRecipient,
-                      'purpose': selectedPurpose,
-                      'status': 'Pending',
-                      'method': selectedMethod,
-                      'reference':
-                          'DISB${(disbursements.length + 1).toString().padLeft(3, '0')}',
-                      'notes': notesController.text,
-                    });
-                  });
+                  final newDisbursement = {
+                    'amount': double.parse(amountController.text),
+                    'date': selectedDate.toString().substring(0, 10),
+                    'recipient': selectedRecipient,
+                    'purpose': selectedPurpose,
+                    'status': 'Completed',
+                    'method': selectedMethod,
+                    'reference': 'DISB${DateTime.now().millisecondsSinceEpoch}',
+                    'notes': notesController.text,
+                  };
+                  await FirebaseFirestore.instance
+                      .collection('disbursements')
+                      .add(newDisbursement);
                   Navigator.pop(context);
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
@@ -790,6 +751,7 @@ class _DisbursementsScreenState extends State<DisbursementsScreen> {
                       backgroundColor: Colors.green,
                     ),
                   );
+                  _fetchDisbursements();
                 }
               },
               child: const Text('Send Money'),

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:syncfusion_flutter_charts/charts.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -13,11 +14,11 @@ class _DashboardScreenState extends State<DashboardScreen>
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
 
-  // Sample data
-  final double targetAmount = 5000;
-  final double currentAmount = 3250;
-  final int totalContributors = 12;
-  final double thisMonthAmount = 520;
+  final double targetAmount = 500000; // Monthly target in UGX
+  double currentAmount = 0;
+  int totalContributors = 0;
+  double thisMonthAmount = 0;
+  List<Map<String, dynamic>> recentContributions = [];
 
   @override
   void initState() {
@@ -30,6 +31,58 @@ class _DashboardScreenState extends State<DashboardScreen>
       CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
     );
     _animationController.forward();
+    _fetchDashboardData();
+  }
+
+  Future<void> _fetchDashboardData() async {
+    // Fetch contributors count
+    final contributorsSnapshot = await FirebaseFirestore.instance
+        .collection('family_members')
+        .get();
+    if (mounted) {
+      setState(() {
+        totalContributors = contributorsSnapshot.size;
+      });
+    }
+    // Fetch this month's amount and current amount
+    final now = DateTime.now();
+    final startOfMonth = DateTime(now.year, now.month, 1);
+    final paymentsSnapshot = await FirebaseFirestore.instance
+        .collection('payments')
+        .where('date', isGreaterThanOrEqualTo: Timestamp.fromDate(startOfMonth))
+        .get();
+    double monthTotal = 0.0;
+    for (var doc in paymentsSnapshot.docs) {
+      monthTotal += doc['amount']?.toDouble() ?? 0.0;
+    }
+    if (mounted) {
+      setState(() {
+        thisMonthAmount = monthTotal;
+        currentAmount = monthTotal;
+      });
+    }
+    // Fetch recent contributions
+    final recentSnapshot = await FirebaseFirestore.instance
+        .collection('payments')
+        .where('date', isGreaterThanOrEqualTo: Timestamp.fromDate(startOfMonth))
+        .orderBy('date', descending: true)
+        .limit(4)
+        .get();
+    if (mounted) {
+      setState(() {
+        recentContributions = recentSnapshot.docs.map((doc) {
+          final data = doc.data();
+          return {
+            'name': data['memberName'] ?? '',
+            'amount': data['amount']?.toDouble() ?? 0.0,
+            'date': (data['date'] as Timestamp).toDate().toString().substring(
+              0,
+              10,
+            ),
+          };
+        }).toList();
+      });
+    }
   }
 
   @override
@@ -38,9 +91,20 @@ class _DashboardScreenState extends State<DashboardScreen>
     super.dispose();
   }
 
+  String formatAmount(double amount) {
+    return amount
+        .toStringAsFixed(0)
+        .replaceAllMapped(
+          RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+          (Match m) => '${m[1]},',
+        );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final progressPercentage = (currentAmount / targetAmount) * 100;
+    final progressPercentage = targetAmount == 0
+        ? 0
+        : (currentAmount / targetAmount) * 100;
 
     return Scaffold(
       backgroundColor: Colors.grey[50],
@@ -138,7 +202,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                                     ),
                                     const SizedBox(height: 8),
                                     Text(
-                                      '\$${currentAmount.toStringAsFixed(0)}',
+                                      'UGX ${formatAmount(currentAmount)}',
                                       style: const TextStyle(
                                         fontSize: 28,
                                         fontWeight: FontWeight.bold,
@@ -146,7 +210,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                                       ),
                                     ),
                                     Text(
-                                      'of \$${targetAmount.toStringAsFixed(0)}',
+                                      'of UGX ${formatAmount(targetAmount)}',
                                       style: TextStyle(
                                         color: Colors.grey[600],
                                         fontSize: 14,
@@ -242,7 +306,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                           Expanded(
                             child: _buildStatCard(
                               'This Month',
-                              '\$${thisMonthAmount.toStringAsFixed(0)}',
+                              'UGX ${formatAmount(thisMonthAmount)}',
                               Icons.calendar_today,
                               Colors.orange,
                               '+8.2%',
@@ -377,13 +441,6 @@ class _DashboardScreenState extends State<DashboardScreen>
   }
 
   Widget _buildRecentContributionsList() {
-    final recentContributions = [
-      {'name': 'John Doe', 'amount': 150.0, 'date': '2024-06-15'},
-      {'name': 'Sarah Smith', 'amount': 200.0, 'date': '2024-06-14'},
-      {'name': 'Mike Johnson', 'amount': 100.0, 'date': '2024-06-13'},
-      {'name': 'Lisa Brown', 'amount': 175.0, 'date': '2024-06-12'},
-    ];
-
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -440,7 +497,7 @@ class _DashboardScreenState extends State<DashboardScreen>
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 Text(
-                  '\$${contribution['amount']}',
+                  'UGX ${formatAmount(contribution['amount'])}',
                   style: const TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 16,
