@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'screens/login_screen.dart';
+import 'screens/main_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -11,6 +13,11 @@ void main() async {
 
 class FamilyContributionsApp extends StatelessWidget {
   const FamilyContributionsApp({super.key});
+
+  Future<bool> _isLoggedIn() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString('userToken') != null;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -26,7 +33,21 @@ class FamilyContributionsApp extends StatelessWidget {
         useMaterial3: true,
         fontFamily: 'Inter',
       ),
-      home: const LoginScreen(),
+      home: FutureBuilder<bool>(
+        future: _isLoggedIn(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Scaffold(
+              body: Center(child: CircularProgressIndicator()),
+            );
+          }
+          if (snapshot.data == true) {
+            return const MainScreen();
+          } else {
+            return const LoginScreen();
+          }
+        },
+      ),
       debugShowCheckedModeBanner: false,
     );
   }

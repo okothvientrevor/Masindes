@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'main_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -78,6 +79,10 @@ class _LoginScreenState extends State<LoginScreen>
             password: _passwordController.text.trim(),
           );
 
+      // Save UID to shared preferences
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('userToken', userCredential.user!.uid);
+
       // Check if user exists in Firestore, if not create with default data
       final userDoc = await FirebaseFirestore.instance
           .collection('users')
@@ -147,6 +152,10 @@ class _LoginScreenState extends State<LoginScreen>
         userCredential.user!,
         _nameController.text.trim(),
       );
+
+      // Save UID to shared preferences
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('userToken', userCredential.user!.uid);
 
       if (mounted) {
         Navigator.pushReplacement(

@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -8,27 +10,71 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  // Sample user data
-  final Map<String, dynamic> userProfile = {
-    'name': 'Sarah Johnson',
-    'email': 'sarah.johnson@email.com',
-    'phone': '+256 701 234 567',
-    'location': 'Kampala, Uganda',
-    'role': 'Family Coordinator',
-    'joinDate': '2024-01-15',
-    'profileImage': '', // Empty for now, will show initials
-  };
+  Map<String, dynamic> userProfile = {};
+  Map<String, dynamic> appStats = {};
+  bool isLoading = true;
 
-  // App statistics
-  final Map<String, dynamic> appStats = {
-    'totalContributions': 2300.0,
-    'totalDisbursements': 1850.0,
-    'familyMembers': 6,
-    'monthsActive': 6,
-  };
+  @override
+  void initState() {
+    super.initState();
+    _fetchProfileData();
+  }
+
+  Future<void> _fetchProfileData() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+    // Fetch user profile
+    final userDoc = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(user.uid)
+        .get();
+    // Fetch app stats
+    final membersSnapshot = await FirebaseFirestore.instance
+        .collection('family_members')
+        .get();
+    final paymentsSnapshot = await FirebaseFirestore.instance
+        .collection('payments')
+        .get();
+    final disbursementsSnapshot = await FirebaseFirestore.instance
+        .collection('disbursements')
+        .get();
+    double totalContributions = 0.0;
+    double totalDisbursements = 0.0;
+    for (var doc in paymentsSnapshot.docs) {
+      if (doc['memberId'] == user.uid) {
+        totalContributions += doc['amount']?.toDouble() ?? 0.0;
+      }
+    }
+    for (var doc in disbursementsSnapshot.docs) {
+      totalDisbursements += doc['amount']?.toDouble() ?? 0.0;
+    }
+    if (mounted) {
+      setState(() {
+        userProfile = userDoc.data() ?? {};
+        appStats = {
+          'totalContributions': totalContributions,
+          'totalDisbursements': totalDisbursements,
+          'familyMembers': membersSnapshot.size,
+          'monthsActive': _getMonthsActive(userProfile['joinDate']),
+        };
+        isLoading = false;
+      });
+    }
+  }
+
+  int _getMonthsActive(String? joinDate) {
+    if (joinDate == null) return 0;
+    final join = DateTime.tryParse(joinDate);
+    if (join == null) return 0;
+    final now = DateTime.now();
+    return (now.year - join.year) * 12 + (now.month - join.month) + 1;
+  }
 
   @override
   Widget build(BuildContext context) {
+    if (isLoading) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
     return Scaffold(
       backgroundColor: Colors.grey[50],
       body: CustomScrollView(
@@ -60,7 +106,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         CircleAvatar(
                           radius: 40,
                           backgroundColor: Colors.white.withOpacity(0.2),
-                          child: userProfile['profileImage'].isEmpty
+                          child: userProfile['profileImage'] == null
                               ? Text(
                                   userProfile['name']
                                       .toString()
@@ -77,7 +123,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         ),
                         const SizedBox(height: 12),
                         Text(
-                          userProfile['name'],
+                          userProfile['name'] ?? '',
                           style: const TextStyle(
                             color: Colors.white,
                             fontSize: 24,
@@ -85,7 +131,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           ),
                         ),
                         Text(
-                          userProfile['role'],
+                          userProfile['role'] ?? '',
                           style: TextStyle(
                             color: Colors.white.withOpacity(0.9),
                             fontSize: 16,
@@ -120,22 +166,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       _buildInfoTile(
                         Icons.email,
                         'Email',
-                        userProfile['email'],
+                        userProfile['email'] ?? '',
                       ),
                       _buildInfoTile(
                         Icons.phone,
                         'Phone',
-                        userProfile['phone'],
+                        userProfile['phone'] ?? '',
                       ),
                       _buildInfoTile(
                         Icons.location_on,
                         'Location',
-                        userProfile['location'],
+                        userProfile['location'] ?? '',
                       ),
                       _buildInfoTile(
                         Icons.calendar_today,
                         'Member Since',
-                        userProfile['joinDate'],
+                        userProfile['joinDate'] ?? '',
                       ),
                     ],
                   ),
@@ -292,6 +338,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
+  // Helper methods
   Widget _buildSectionCard({
     required String title,
     required IconData icon,
@@ -459,13 +506,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   void _showEditProfileDialog() {
-    final nameController = TextEditingController(text: userProfile['name']);
-    final emailController = TextEditingController(text: userProfile['email']);
-    final phoneController = TextEditingController(text: userProfile['phone']);
+    final nameController = TextEditingController(
+      text: userProfile['name'] ?? '',
+    );
+    final emailController = TextEditingController(
+      text: userProfile['email'] ?? '',
+    );
+    final phoneController = TextEditingController(
+      text: userProfile['phone'] ?? '',
+    );
     final locationController = TextEditingController(
-      text: userProfile['location'],
+      text: userProfile['location'] ?? '',
     );
     final formKey = GlobalKey<FormState>();
+    final user = FirebaseAuth.instance.currentUser;
 
     showDialog(
       context: context,
@@ -552,14 +606,25 @@ class _ProfileScreenState extends State<ProfileScreen> {
             child: const Text('Cancel'),
           ),
           ElevatedButton(
-            onPressed: () {
+            onPressed: () async {
               if (formKey.currentState?.validate() ?? false) {
-                setState(() {
-                  userProfile['name'] = nameController.text.trim();
-                  userProfile['email'] = emailController.text.trim();
-                  userProfile['phone'] = phoneController.text.trim();
-                  userProfile['location'] = locationController.text.trim();
-                });
+                if (user != null) {
+                  await FirebaseFirestore.instance
+                      .collection('users')
+                      .doc(user.uid)
+                      .update({
+                        'name': nameController.text.trim(),
+                        'email': emailController.text.trim(),
+                        'phone': phoneController.text.trim(),
+                        'location': locationController.text.trim(),
+                      });
+                  setState(() {
+                    userProfile['name'] = nameController.text.trim();
+                    userProfile['email'] = emailController.text.trim();
+                    userProfile['phone'] = phoneController.text.trim();
+                    userProfile['location'] = locationController.text.trim();
+                  });
+                }
                 Navigator.pop(context);
               }
             },
