@@ -17,7 +17,7 @@ class _AddPaymentFormState extends State<AddPaymentForm> {
 
   String? selectedMemberId;
   String? selectedMemberName;
-  String selectedMethod = 'Bank Transfer';
+  String selectedMethod = 'Mobile Money';
   DateTime selectedDate = DateTime.now();
   bool isLoading = false;
   List<Map<String, dynamic>> familyMembers = [];

@@ -1,6 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:syncfusion_flutter_charts/charts.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'dashboard_widgets/stat_card.dart';
+import 'dashboard_widgets/section_header.dart';
+import 'dashboard_widgets/recent_contributions_list.dart';
+import 'dashboard_widgets/quick_actions_grid.dart';
+import 'dashboard_widgets/chart_data.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -294,39 +299,65 @@ class _DashboardScreenState extends State<DashboardScreen>
                       Row(
                         children: [
                           Expanded(
-                            child: _buildStatCard(
-                              'Total Contributors',
-                              totalContributors.toString(),
-                              Icons.people,
-                              Colors.blue,
-                              '+2 this month',
+                            child: StatCard(
+                              title: 'Total Contributors',
+                              value: totalContributors.toString(),
+                              icon: Icons.people,
+                              color: Colors.blue,
+                              trend: '+2 this month',
                             ),
                           ),
                           const SizedBox(width: 16),
                           Expanded(
-                            child: _buildStatCard(
-                              'This Month',
-                              'UGX ${formatAmount(thisMonthAmount)}',
-                              Icons.calendar_today,
-                              Colors.orange,
-                              '+8.2%',
+                            child: StatCard(
+                              title: 'This Month',
+                              value: 'UGX ${formatAmount(thisMonthAmount)}',
+                              icon: Icons.calendar_today,
+                              color: Colors.orange,
+                              trend: '+8.2%',
                             ),
                           ),
                         ],
                       ),
                       const SizedBox(height: 32),
-
-                      // Recent Contributions Section
-                      _buildSectionHeader('Recent Contributions', 'View All'),
+                      SectionHeader(
+                        title: 'Recent Contributions',
+                        action: 'View All',
+                        onAction: () {},
+                      ),
                       const SizedBox(height: 16),
-                      _buildRecentContributionsList(),
-
+                      RecentContributionsList(
+                        recentContributions: recentContributions,
+                        formatAmount: formatAmount,
+                      ),
                       const SizedBox(height: 32),
-
-                      // Quick Actions Section
-                      _buildSectionHeader('Quick Actions', ''),
+                      SectionHeader(title: 'Quick Actions', action: ''),
                       const SizedBox(height: 16),
-                      _buildQuickActionsGrid(),
+                      QuickActionsGrid(
+                        actions: [
+                          {
+                            'title': 'Add Payment',
+                            'icon': Icons.add,
+                            'color': Colors.blue,
+                          },
+                          {
+                            'title': 'Family Members',
+                            'icon': Icons.people,
+                            'color': Colors.purple,
+                          },
+                          {
+                            'title': 'Disbursements',
+                            'icon': Icons.account_balance,
+                            'color': Colors.orange,
+                          },
+                          {
+                            'title': 'Export Report',
+                            'icon': Icons.file_download,
+                            'color': Colors.green,
+                          },
+                        ],
+                        onTap: (index) {},
+                      ),
                     ],
                   ),
                 ),
@@ -335,279 +366,6 @@ class _DashboardScreenState extends State<DashboardScreen>
           ),
         ),
       ),
-    );
-  }
-
-  Widget _buildStatCard(
-    String title,
-    String value,
-    IconData icon,
-    Color color,
-    String trend,
-  ) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 5),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: color.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(icon, color: color, size: 20),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-              color: color,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            title,
-            style: TextStyle(
-              color: Colors.grey[600],
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            decoration: BoxDecoration(
-              color: Colors.green.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Text(
-              trend,
-              style: const TextStyle(
-                color: Colors.green,
-                fontSize: 10,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSectionHeader(String title, String action) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(
-          title,
-          style: const TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-            color: Colors.black87,
-          ),
-        ),
-        if (action.isNotEmpty)
-          TextButton(
-            onPressed: () {},
-            child: Text(
-              action,
-              style: TextStyle(
-                color: Theme.of(context).primaryColor,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-      ],
-    );
-  }
-
-  Widget _buildRecentContributionsList() {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 5),
-          ),
-        ],
-      ),
-      child: ListView.separated(
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        itemCount: recentContributions.length,
-        separatorBuilder: (context, index) => Divider(
-          color: Colors.grey[200],
-          height: 1,
-          indent: 16,
-          endIndent: 16,
-        ),
-        itemBuilder: (context, index) {
-          final contribution = recentContributions[index];
-          return ListTile(
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 16,
-              vertical: 8,
-            ),
-            leading: CircleAvatar(
-              backgroundColor: Theme.of(context).primaryColor.withOpacity(0.1),
-              child: Text(
-                contribution['name']
-                    .toString()
-                    .split(' ')
-                    .map((e) => e[0])
-                    .join(),
-                style: TextStyle(
-                  color: Theme.of(context).primaryColor,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-            title: Text(
-              contribution['name'].toString(),
-              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
-            ),
-            subtitle: Text(
-              contribution['date'].toString(),
-              style: TextStyle(color: Colors.grey[600], fontSize: 12),
-            ),
-            trailing: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Text(
-                  'UGX ${formatAmount(contribution['amount'])}',
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                    color: Colors.green,
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 6,
-                    vertical: 2,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.green.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Text(
-                    'Confirmed',
-                    style: TextStyle(
-                      color: Colors.green,
-                      fontSize: 10,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          );
-        },
-      ),
-    );
-  }
-
-  Widget _buildQuickActionsGrid() {
-    final actions = [
-      {'title': 'Add Payment', 'icon': Icons.add, 'color': Colors.blue},
-      {'title': 'Family Members', 'icon': Icons.people, 'color': Colors.purple},
-      {
-        'title': 'Disbursements',
-        'icon': Icons.account_balance,
-        'color': Colors.orange,
-      },
-      {
-        'title': 'Export Report',
-        'icon': Icons.file_download,
-        'color': Colors.green,
-      },
-    ];
-
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        crossAxisSpacing: 16,
-        mainAxisSpacing: 16,
-        childAspectRatio: 1.5,
-      ),
-      itemCount: actions.length,
-      itemBuilder: (context, index) {
-        final action = actions[index];
-        return Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.05),
-                blurRadius: 10,
-                offset: const Offset(0, 5),
-              ),
-            ],
-          ),
-          child: Material(
-            color: Colors.transparent,
-            child: InkWell(
-              borderRadius: BorderRadius.circular(16),
-              onTap: () {},
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: (action['color'] as Color).withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Icon(
-                        action['icon'] as IconData,
-                        color: action['color'] as Color,
-                        size: 24,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      action['title'] as String,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w600,
-                        fontSize: 14,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        );
-      },
     );
   }
 }

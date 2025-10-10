@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'dashboard_screen.dart';
 import 'payments_screen.dart';
 import 'family_members_screen.dart';
 import 'disbursements_screen.dart';
 import 'profile_screen.dart';
+import 'package:device_info_plus/device_info_plus.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -21,6 +23,11 @@ class _MainScreenState extends State<MainScreen> {
     const DisbursementsScreen(),
     const ProfileScreen(),
   ];
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+  }
 
   @override
   Widget build(BuildContext context) {
